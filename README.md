@@ -159,7 +159,7 @@ hint instead.
 
 ## Is it safe on my code?
 
-Fair thing to ask about anything that rewrites your files. Four suites run
+Fair thing to ask about anything that rewrites your files. Five suites run
 before every change, and a file that is already clean comes back byte for byte
 identical.
 
@@ -168,6 +168,7 @@ python3 tools/tests/test_normfix.py     # 26 passed, 0 failed
 python3 tools/tests/test_semantics.py   #  8 passed, 0 failed
 python3 tools/tests/test_submit.py      # 23 passed, 0 failed
 python3 tools/tests/test_fuzz.py 30     # 30 passed, 0 failed
+python3 tools/tests/test_docs.py        # guide and READMEs agree
 ```
 
 The semantics suite compiles each program, runs it, formats it, compiles and
@@ -264,7 +265,7 @@ tools/
   vscode_setup.py    editor settings merge, with backup
   install.sh         one-command install
   editor/            vim plugin, VS Code settings and tasks
-  tests/             four suites
+  tests/             five suites
 ```
 
 Python and bash. The only C++ in the stack is clang-format, which ships prebuilt

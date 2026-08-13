@@ -162,7 +162,7 @@ te les affiche avec une piste à la place.
 
 ## C'est safe sur mon code ?
 
-Question légitime pour un truc qui réécrit tes fichiers. Quatre suites de tests
+Question légitime pour un truc qui réécrit tes fichiers. Cinq suites de tests
 tournent avant chaque modification, et un fichier déjà propre ressort octet pour
 octet identique.
 
@@ -171,6 +171,7 @@ python3 tools/tests/test_normfix.py     # 26 passed, 0 failed
 python3 tools/tests/test_semantics.py   #  8 passed, 0 failed
 python3 tools/tests/test_submit.py      # 23 passed, 0 failed
 python3 tools/tests/test_fuzz.py 30     # 30 passed, 0 failed
+python3 tools/tests/test_docs.py        # guide and READMEs agree
 ```
 
 La suite « semantics » compile chaque programme, l'exécute, le formate,
@@ -268,7 +269,7 @@ tools/
   vscode_setup.py    fusion des réglages éditeur, avec sauvegarde
   install.sh         installation en une commande
   editor/            plugin vim, réglages et tâches VS Code
-  tests/             quatre suites
+  tests/             cinq suites
 ```
 
 Python et bash. Le seul C++ de la pile est clang-format, livré précompilé dans le
