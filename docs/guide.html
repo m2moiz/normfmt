@@ -1,0 +1,899 @@
+<title>normfmt — the 42 Norm, handled</title>
+<style>
+	/* ---------------------------------------------------------------- tokens */
+	:root {
+		--paper: #f4f5f7;
+		--card: #ffffff;
+		--ink: #14161c;
+		--ink-soft: #4a4f5c;
+		--ink-faint: #7b8192;
+		--rule: #d9dce4;
+		--rule-soft: #e7e9ef;
+		--accent: #2b3f8f;
+		--accent-soft: #e6e9f6;
+		--ok: #1b6b45;
+		--bad: #a8322a;
+		--term-bg: #14161c;
+		--term-ink: #dfe2ea;
+		--term-faint: #7b8192;
+		--term-rule: #2b2f3a;
+
+		--display: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+		--body: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+		--mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme="light"]) {
+			--paper: #0e1015;
+			--card: #171a21;
+			--ink: #e8eaf0;
+			--ink-soft: #a8aebd;
+			--ink-faint: #767d8e;
+			--rule: #2a2e39;
+			--rule-soft: #21242d;
+			--accent: #93a6ee;
+			--accent-soft: #1c2340;
+			--ok: #5fbf90;
+			--bad: #e08078;
+			--term-bg: #05070b;
+			--term-ink: #dfe2ea;
+			--term-faint: #767d8e;
+			--term-rule: #232732;
+		}
+	}
+
+	:root[data-theme="dark"] {
+		--paper: #0e1015;
+		--card: #171a21;
+		--ink: #e8eaf0;
+		--ink-soft: #a8aebd;
+		--ink-faint: #767d8e;
+		--rule: #2a2e39;
+		--rule-soft: #21242d;
+		--accent: #93a6ee;
+		--accent-soft: #1c2340;
+		--ok: #5fbf90;
+		--bad: #e08078;
+		--term-bg: #05070b;
+		--term-ink: #dfe2ea;
+		--term-faint: #767d8e;
+		--term-rule: #232732;
+	}
+
+	/* ------------------------------------------------------------ languages */
+	:root:not([data-ui="fr"]) [data-lang="fr"] { display: none !important; }
+	:root[data-ui="fr"] [data-lang="en"] { display: none !important; }
+
+	/* ----------------------------------------------------------------- base */
+	body {
+		background: var(--paper);
+		color: var(--ink);
+		font-family: var(--body);
+		font-size: 17px;
+		line-height: 1.65;
+		margin: 0;
+		-webkit-font-smoothing: antialiased;
+	}
+
+	.wrap {
+		max-width: 47rem;
+		margin: 0 auto;
+		padding: 0 1.5rem 6rem;
+	}
+
+	p { margin: 0 0 1.1em; max-width: 66ch; }
+	a { color: var(--accent); text-underline-offset: 3px; }
+	a:focus-visible, summary:focus-visible, button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 3px;
+		border-radius: 2px;
+	}
+
+	h1, h2, h3 { font-family: var(--display); font-weight: 600; text-wrap: balance; }
+
+	/* ------------------------------------------------------------ lang switch */
+	.langbar {
+		display: flex;
+		justify-content: flex-end;
+		padding-top: 1.4rem;
+	}
+
+	.switch {
+		display: inline-flex;
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		overflow: hidden;
+		background: var(--card);
+	}
+
+	.switch button {
+		font-family: var(--display);
+		font-size: 0.72rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		padding: 0.34rem 0.85rem;
+		border: 0;
+		background: transparent;
+		color: var(--ink-faint);
+		cursor: pointer;
+	}
+
+	.switch button[aria-pressed="true"] {
+		background: var(--accent);
+		color: var(--card);
+	}
+
+	/* ----------------------------------------------------------------- hero */
+	.hero {
+		border-bottom: 1px solid var(--rule);
+		padding: 2.5rem 0 3rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.4rem;
+	}
+
+	.eyebrow {
+		font-family: var(--display);
+		font-size: 0.72rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--ink-faint);
+		margin: 0;
+	}
+
+	h1 {
+		font-size: clamp(2.2rem, 6vw, 3.1rem);
+		letter-spacing: -0.03em;
+		line-height: 1.05;
+		margin: 0;
+	}
+
+	.standfirst {
+		font-size: 1.2rem;
+		color: var(--ink-soft);
+		margin: 0;
+		max-width: 54ch;
+	}
+
+	.badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.2rem; }
+
+	.badge {
+		font-family: var(--display);
+		font-size: 0.74rem;
+		letter-spacing: 0.02em;
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		padding: 0.28rem 0.7rem;
+		color: var(--ink-soft);
+		background: var(--card);
+	}
+
+	/* ------------------------------------------------------------- sections */
+	section { padding-top: 3.2rem; }
+
+	h2 {
+		font-size: 1.02rem;
+		letter-spacing: 0.02em;
+		margin: 0 0 1.2rem;
+		padding-bottom: 0.6rem;
+		border-bottom: 1px solid var(--rule-soft);
+		display: flex;
+		align-items: baseline;
+		gap: 0.7rem;
+	}
+
+	h2 .num {
+		color: var(--accent);
+		font-size: 0.78rem;
+		letter-spacing: 0.1em;
+	}
+
+	h3 {
+		font-size: 0.88rem;
+		letter-spacing: 0.02em;
+		margin: 2rem 0 0.6rem;
+		color: var(--ink);
+	}
+
+	/* ------------------------------------------------------------- terminal */
+	.term {
+		background: var(--term-bg);
+		color: var(--term-ink);
+		border: 1px solid var(--term-rule);
+		border-radius: 8px;
+		font-family: var(--mono);
+		font-size: 0.83rem;
+		line-height: 1.7;
+		padding: 1rem 1.1rem;
+		overflow-x: auto;
+		margin: 0 0 1.2rem;
+		tab-size: 4;
+	}
+
+	.term .c { color: var(--term-faint); }
+	.term .p { color: #7f9cf0; }
+	.term .ok { color: #5fbf90; }
+	.term .er { color: #e08078; }
+
+	code:not(.term code) {
+		font-family: var(--mono);
+		font-size: 0.86em;
+		background: var(--accent-soft);
+		color: var(--ink);
+		padding: 0.1em 0.35em;
+		border-radius: 3px;
+	}
+
+	/* ------------------------------------------------------ before / after */
+	.ba {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.9rem;
+		margin-bottom: 1.2rem;
+	}
+
+	@media (max-width: 40rem) {
+		.ba { grid-template-columns: 1fr; }
+	}
+
+	.ba figure { margin: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+
+	.ba figcaption {
+		font-family: var(--display);
+		font-size: 0.7rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+	}
+
+	.ba .in figcaption { color: var(--bad); }
+	.ba .out figcaption { color: var(--ok); }
+	.ba pre { margin: 0; flex: 1; }
+
+	/* ---------------------------------------------------------------- table */
+	.tablewrap { overflow-x: auto; margin-bottom: 1.2rem; }
+
+	table {
+		border-collapse: collapse;
+		width: 100%;
+		font-size: 0.94rem;
+	}
+
+	th, td {
+		text-align: left;
+		padding: 0.6rem 0.9rem 0.6rem 0;
+		border-bottom: 1px solid var(--rule-soft);
+		vertical-align: top;
+	}
+
+	th {
+		font-family: var(--display);
+		font-size: 0.7rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--ink-faint);
+		font-weight: 600;
+	}
+
+	td:first-child { font-family: var(--mono); font-size: 0.85rem; white-space: nowrap; }
+
+	/* ---------------------------------------------------------------- steps */
+	.steps { display: flex; flex-direction: column; gap: 1.8rem; margin-bottom: 1rem; }
+
+	.step { display: grid; grid-template-columns: 2.2rem 1fr; gap: 0 1rem; align-items: start; }
+
+	.step .n {
+		font-family: var(--display);
+		font-size: 0.78rem;
+		color: var(--accent);
+		border: 1px solid var(--rule);
+		background: var(--card);
+		border-radius: 999px;
+		width: 1.9rem;
+		height: 1.9rem;
+		display: grid;
+		place-items: center;
+		margin-top: 0.15rem;
+	}
+
+	.step h3 { margin: 0.15rem 0 0.5rem; }
+	.step > div > :last-child { margin-bottom: 0; }
+
+	@media (max-width: 34rem) {
+		.step { grid-template-columns: 1fr; gap: 0.5rem; }
+	}
+
+	/* ---------------------------------------------------------------- notes */
+	.note {
+		border-left: 2px solid var(--accent);
+		background: var(--accent-soft);
+		padding: 0.85rem 1rem;
+		border-radius: 0 5px 5px 0;
+		font-size: 0.95rem;
+		margin: 0 0 1.2rem;
+	}
+
+	.note :last-child { margin-bottom: 0; }
+	.note strong { font-family: var(--display); font-size: 0.9em; letter-spacing: 0.01em; }
+
+	details {
+		border-bottom: 1px solid var(--rule-soft);
+		padding: 0.75rem 0;
+	}
+
+	summary {
+		cursor: pointer;
+		font-family: var(--display);
+		font-size: 0.86rem;
+		color: var(--ink);
+	}
+
+	details p { margin: 0.7rem 0 0.2rem; color: var(--ink-soft); font-size: 0.96rem; }
+
+	footer {
+		margin-top: 4rem;
+		padding-top: 1.4rem;
+		border-top: 1px solid var(--rule);
+		font-family: var(--display);
+		font-size: 0.76rem;
+		color: var(--ink-faint);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1.4rem;
+	}
+</style>
+
+<div class="wrap">
+
+	<div class="langbar">
+		<div class="switch" role="group" aria-label="Language / Langue">
+			<button type="button" id="btn-en" aria-pressed="true">English</button>
+			<button type="button" id="btn-fr" aria-pressed="false">Français</button>
+		</div>
+	</div>
+
+	<header class="hero">
+		<p class="eyebrow" data-lang="en">42 · Piscine and after</p>
+		<p class="eyebrow" data-lang="fr">42 · Piscine et après</p>
+
+		<h1 data-lang="en">Stop fixing<br>the Norm by hand.</h1>
+		<h1 data-lang="fr">Arrête de corriger<br>la Norme à la main.</h1>
+
+		<p class="standfirst" data-lang="en">
+			<code>normfmt</code> formats your C to the 42 Norm, writes the header, runs norminette,
+			and tells you what is left. Terminal, vim, VS&nbsp;Code. One install command.
+		</p>
+		<p class="standfirst" data-lang="fr">
+			<code>normfmt</code> formate ton C à la Norme, écrit le header, lance norminette et
+			t'affiche ce qu'il reste. Terminal, vim, VS&nbsp;Code. Une seule commande pour tout
+			installer.
+		</p>
+
+		<div class="badges">
+			<span class="badge" data-lang="en">no sudo</span>
+			<span class="badge" data-lang="fr">sans sudo</span>
+			<span class="badge" data-lang="en">no Homebrew</span>
+			<span class="badge" data-lang="fr">sans Homebrew</span>
+			<span class="badge">~20 MB</span>
+			<span class="badge" data-lang="en">works on a cluster iMac</span>
+			<span class="badge" data-lang="fr">marche sur un iMac du cluster</span>
+		</div>
+	</header>
+
+	<section>
+		<h2><span class="num">01</span><span data-lang="en">What it does</span><span data-lang="fr">Ce qu'il fait</span></h2>
+
+		<p data-lang="en">
+			Tabs, parentheses, blank lines. All the parts of the Norm that have nothing to do with
+			your algorithm and everything to do with where the whitespace goes. You write the logic,
+			it handles the rest.
+		</p>
+		<p data-lang="fr">
+			Les tabulations, les parenthèses, les lignes vides. Tout ce qui, dans la Norme, n'a rien
+			à voir avec ton algo et tout à voir avec la position des espaces. Tu écris la logique,
+			il s'occupe du reste.
+		</p>
+
+		<div class="ba">
+			<figure class="in">
+				<figcaption data-lang="en">what you write</figcaption>
+				<figcaption data-lang="fr">ce que tu écris</figcaption>
+				<pre class="term">int	ft_max(int *tab, int len) {
+  int i = 0;
+  int max=tab[0];
+  while(i&lt;len)
+  {
+    if (tab[i] &gt; max) max = tab[i];
+    i++;
+  }
+  return max;
+}</pre>
+			</figure>
+			<figure class="out">
+				<figcaption data-lang="en">what you get</figcaption>
+				<figcaption data-lang="fr">ce que tu obtiens</figcaption>
+				<pre class="term">int	ft_max(int *tab, int len)
+{
+	int	i;
+	int	max;
+
+	i = 0;
+	max = tab[0];
+	while (i &lt; len)
+	{
+		if (tab[i] &gt; max)
+			max = tab[i];
+		i++;
+	}
+	return (max);
+}</pre>
+			</figure>
+		</div>
+
+		<p data-lang="en">
+			Header on top with your login, and <span style="color:var(--ok)">norminette: OK!</span>
+			Ten errors gone, and you never had to read one of them.
+		</p>
+		<p data-lang="fr">
+			Header en haut avec ton login, et <span style="color:var(--ok)">norminette: OK!</span>
+			Dix erreurs en moins, sans en lire une seule.
+		</p>
+	</section>
+
+	<section>
+		<h2><span class="num">02</span><span data-lang="en">Install</span><span data-lang="fr">Installation</span></h2>
+
+		<div class="steps">
+
+			<div class="step">
+				<div class="n">1</div>
+				<div>
+					<h3 data-lang="en">Clone it, run one command</h3>
+					<h3 data-lang="fr">Clone, puis une seule commande</h3>
+					<pre class="term"><span class="p">$</span> git clone https://github.com/m2moiz/normfmt.git ~/normfmt
+<span class="p">$</span> cd ~/normfmt
+<span class="p">$</span> ./tools/install.sh</pre>
+					<p data-lang="en">
+						That covers the terminal command, vim, and VS&nbsp;Code in one go. Open a
+						new terminal when it finishes.
+					</p>
+					<p data-lang="fr">
+						Ça installe la commande, vim et VS&nbsp;Code d'un coup. Ouvre un nouveau
+						terminal une fois que c'est fini.
+					</p>
+				</div>
+			</div>
+
+			<div class="step">
+				<div class="n">2</div>
+				<div>
+					<h3 data-lang="en">Check your login</h3>
+					<h3 data-lang="fr">Vérifie ton login</h3>
+					<p data-lang="en">
+						It reads your login from <code>$USER</code>, which is already right on a
+						cluster machine. On your own laptop, pass it yourself:
+					</p>
+					<p data-lang="fr">
+						Il lit ton login dans <code>$USER</code>, ce qui est déjà correct sur une
+						machine du cluster. Sur ton propre portable, passe-le à la main :
+					</p>
+					<pre class="term" data-lang="en"><span class="p">$</span> ./tools/install.sh --login &lt;your_login&gt;</pre>
+					<pre class="term" data-lang="fr"><span class="p">$</span> ./tools/install.sh --login &lt;ton_login&gt;</pre>
+					<p data-lang="en">
+						This ends up in the header of every file the tool touches, so get it right
+						the first time.
+					</p>
+					<p data-lang="fr">
+						Ça finit dans le header de chaque fichier que l'outil touche, donc autant
+						ne pas se tromper.
+					</p>
+				</div>
+			</div>
+
+			<div class="step">
+				<div class="n">3</div>
+				<div>
+					<h3 data-lang="en">VS Code needs one extension</h3>
+					<h3 data-lang="fr">VS Code a besoin d'une extension</h3>
+					<p data-lang="en">
+						Install <strong>Run on Save</strong> by <em>emeraldwalk</em> from the
+						Extensions sidebar. The installer does it for you when the
+						<code>code</code> command is on your <code>$PATH</code>, and says so when
+						it could not. Without it, saving does nothing.
+					</p>
+					<p data-lang="fr">
+						Installe <strong>Run on Save</strong> de <em>emeraldwalk</em> depuis la
+						barre latérale Extensions. L'installeur le fait tout seul si la commande
+						<code>code</code> est dans ton <code>$PATH</code>, et te prévient sinon.
+						Sans elle, sauvegarder ne déclenche rien.
+					</p>
+				</div>
+			</div>
+
+		</div>
+
+		<p data-lang="en">
+			Other flags: <code>--core-only</code> if you want the command and nothing touched in
+			your editor, <code>--email &lt;addr&gt;</code>, and <code>--uninstall</code> to take it
+			all back off.
+		</p>
+		<p data-lang="fr">
+			Autres options : <code>--core-only</code> si tu veux juste la commande sans qu'il touche
+			à ton éditeur, <code>--email &lt;adresse&gt;</code>, et <code>--uninstall</code> pour tout
+			retirer.
+		</p>
+	</section>
+
+	<section>
+		<h2><span class="num">03</span><span data-lang="en">Using it</span><span data-lang="fr">L'utiliser</span></h2>
+
+		<pre class="term" data-lang="en"><span class="p">$</span> normfmt ft_strlen.c     <span class="c"># format one file, then check it</span>
+<span class="p">$</span> normfmt                 <span class="c"># every .c/.h below the current directory</span>
+<span class="p">$</span> normfmt -n              <span class="c"># check only, rewrite nothing</span></pre>
+		<pre class="term" data-lang="fr"><span class="p">$</span> normfmt ft_strlen.c     <span class="c"># formate un fichier, puis le vérifie</span>
+<span class="p">$</span> normfmt                 <span class="c"># tous les .c/.h sous le dossier courant</span>
+<span class="p">$</span> normfmt -n              <span class="c"># vérifie seulement, ne réécrit rien</span></pre>
+
+		<p data-lang="en">
+			In vim it runs on <code>:w</code>, and <code>:NormFmt</code> runs it on demand. Put
+			<code>let g:normfmt_on_save = 0</code> in your <code>.vimrc</code> if you want the
+			command without the autosave. In VS&nbsp;Code it runs on save.
+		</p>
+		<p data-lang="fr">
+			Dans vim il se déclenche sur <code>:w</code>, et <code>:NormFmt</code> le lance à la
+			demande. Mets <code>let g:normfmt_on_save = 0</code> dans ton <code>.vimrc</code> si tu
+			veux la commande sans l'automatisme. Dans VS&nbsp;Code il tourne à la sauvegarde.
+		</p>
+
+		<p data-lang="en">Its exit code is norminette's, so it drops into a Makefile as is:</p>
+		<p data-lang="fr">Son code de retour est celui de norminette, donc il s'insère tel quel dans un Makefile :</p>
+
+		<pre class="term">norm:
+	@normfmt</pre>
+	</section>
+
+	<section>
+		<h2><span class="num">04</span><span data-lang="en">Before you push</span><span data-lang="fr">Avant de push</span></h2>
+
+		<p data-lang="en">
+			A leftover <code>main()</code> and files the subject never asked for are two of the
+			easier ways to collect a zero. <code>normsubmit</code> reads what you are about to
+			commit and says what looks wrong.
+		</p>
+		<p data-lang="fr">
+			Un <code>main()</code> oublié et des fichiers que le sujet n'a jamais demandés : deux
+			bons moyens de récolter un zéro. <code>normsubmit</code> regarde ce que tu t'apprêtes à
+			commit et te dit ce qui cloche.
+		</p>
+
+		<pre class="term" data-lang="en"><span class="p">$</span> normsubmit
+
+<span class="er">main() found</span> — the subject usually wants the function only:
+  ./ft_strlen.c
+  ./main.c  <span class="c">(looks like a test driver, do not submit it at all)</span>
+  fix: normsubmit --strip-main ./ft_strlen.c
+
+<span class="er">build output / junk</span> — delete before committing:
+  ./a.out   ./ft_strlen.o   ./ft_strlen.dSYM   ./.DS_Store
+  fix: normsubmit --clean
+
+<span class="er">git is already tracking these</span> — they WILL be submitted:
+  ./main.c
+  fix: git rm --cached &lt;file&gt;, and add it to .gitignore</pre>
+
+		<pre class="term" data-lang="fr"><span class="p">$</span> normsubmit
+
+<span class="er">main() trouvé</span> — le sujet ne demande souvent que la fonction :
+  ./ft_strlen.c
+  ./main.c  <span class="c">(ressemble à un fichier de test, à ne pas rendre du tout)</span>
+  fix: normsubmit --strip-main ./ft_strlen.c
+
+<span class="er">fichiers de compilation</span> — à supprimer avant de commit :
+  ./a.out   ./ft_strlen.o   ./ft_strlen.dSYM   ./.DS_Store
+  fix: normsubmit --clean
+
+<span class="er">git suit déjà ces fichiers</span> — ils SERONT rendus :
+  ./main.c
+  fix: git rm --cached &lt;fichier&gt;, puis ajoute-le au .gitignore</pre>
+
+		<pre class="term" data-lang="en"><span class="p">$</span> normsubmit --strip-main   <span class="c"># comment main() out, reversibly</span>
+<span class="p">$</span> normsubmit --restore-main <span class="c"># put it back so you can keep testing</span>
+<span class="p">$</span> normsubmit --clean        <span class="c"># delete build junk (it asks first)</span>
+<span class="p">$</span> normsubmit --gitignore    <span class="c"># a .gitignore that suits a 42 repo</span></pre>
+
+		<pre class="term" data-lang="fr"><span class="p">$</span> normsubmit --strip-main   <span class="c"># commente le main(), de façon réversible</span>
+<span class="p">$</span> normsubmit --restore-main <span class="c"># le remet pour continuer à tester</span>
+<span class="p">$</span> normsubmit --clean        <span class="c"># supprime les fichiers de compil (il demande avant)</span>
+<span class="p">$</span> normsubmit --gitignore    <span class="c"># un .gitignore adapté à un repo 42</span></pre>
+
+		<p data-lang="en">
+			<code>--strip-main</code> comments the function out behind a marker, so
+			<code>--restore-main</code> hands you back the original file byte for byte and you can
+			keep testing. The commented version still passes norminette.
+		</p>
+		<p data-lang="fr">
+			<code>--strip-main</code> commente la fonction derrière un marqueur, donc
+			<code>--restore-main</code> te rend le fichier d'origine octet pour octet et tu peux
+			continuer à tester. La version commentée passe toujours norminette.
+		</p>
+
+		<div class="note">
+			<p data-lang="en">
+				<strong>It will not delete anything you wrote.</strong> <code>--clean</code> prints
+				the list and waits for a yes, and it only removes build output: <code>.o</code>,
+				<code>.a</code>, <code>a.out</code>, <code>.dSYM</code>, <code>.DS_Store</code>,
+				compiled binaries. Your source files get reported, never removed.
+			</p>
+			<p data-lang="fr">
+				<strong>Il ne supprimera rien que tu aies écrit.</strong> <code>--clean</code>
+				affiche la liste et attend un oui, et il ne retire que des fichiers de compilation :
+				<code>.o</code>, <code>.a</code>, <code>a.out</code>, <code>.dSYM</code>,
+				<code>.DS_Store</code>, binaires compilés. Tes sources sont signalées, jamais
+				supprimées.
+			</p>
+		</div>
+
+		<p data-lang="en">
+			It exits 1 when something looks wrong, so it works as a pre-commit hook. Whatever it
+			says, stage your files by name. <code>git add .</code> is how people lose points.
+		</p>
+		<p data-lang="fr">
+			Il sort en 1 quand quelque chose cloche, donc il marche comme hook de pre-commit. Quoi
+			qu'il te dise, stage tes fichiers par leur nom. C'est avec <code>git add .</code> qu'on
+			perd des points.
+		</p>
+	</section>
+
+	<section>
+		<h2><span class="num">05</span><span data-lang="en">What it will not fix</span><span data-lang="fr">Ce qu'il ne corrigera pas</span></h2>
+
+		<p data-lang="en">
+			Anything that needs a decision about your program rather than its layout. A tool that
+			guessed here would be worse than no tool, so it prints these with a short hint instead.
+		</p>
+		<p data-lang="fr">
+			Tout ce qui demande une décision sur ton programme plutôt que sur sa mise en forme. Un
+			outil qui devinerait ici serait pire que pas d'outil du tout, donc il te les affiche
+			avec une piste à la place.
+		</p>
+
+		<div class="tablewrap">
+			<table>
+				<thead>
+					<tr>
+						<th data-lang="en">Norm error</th>
+						<th data-lang="fr">Erreur Norme</th>
+						<th data-lang="en">Why it is yours</th>
+						<th data-lang="fr">Pourquoi c'est à toi de le faire</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>TOO_MANY_LINES</td>
+						<td data-lang="en">Splitting a function is a design call</td>
+						<td data-lang="fr">Découper une fonction, c'est un choix de conception</td>
+					</tr>
+					<tr>
+						<td>TOO_MANY_FUNCS</td>
+						<td data-lang="en">Which file does it move to?</td>
+						<td data-lang="fr">Dans quel fichier la déplacer ?</td>
+					</tr>
+					<tr>
+						<td>TOO_MANY_VARS_FUNC</td>
+						<td data-lang="en">Fewer variables, or split the function</td>
+						<td data-lang="fr">Moins de variables, ou découpe la fonction</td>
+					</tr>
+					<tr>
+						<td>FORBIDDEN_CS</td>
+						<td data-lang="en">Turning a <code>for</code> into a <code>while</code> changes the code</td>
+						<td data-lang="fr">Transformer un <code>for</code> en <code>while</code> change le code</td>
+					</tr>
+					<tr>
+						<td>ASSIGN_IN_CONTROL</td>
+						<td data-lang="en">Move the assignment out of the condition</td>
+						<td data-lang="fr">Sors l'affectation de la condition</td>
+					</tr>
+					<tr>
+						<td>FORBIDDEN_CHAR_NAME</td>
+						<td data-lang="en">No rule turns a bad name into a good one</td>
+						<td data-lang="fr">Aucune règle ne transforme un mauvais nom en bon nom</td>
+					</tr>
+					<tr>
+						<td>WRONG_SCOPE_COMMENT</td>
+						<td data-lang="en">The Norm bans comments inside a function, and deleting yours is not the tool's call</td>
+						<td data-lang="fr">La Norme interdit les commentaires dans une fonction, et ce n'est pas à l'outil de supprimer les tiens</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</section>
+
+	<section>
+		<h2><span class="num">06</span><span data-lang="en">Is it safe on my code?</span><span data-lang="fr">C'est safe sur mon code ?</span></h2>
+
+		<p data-lang="en">
+			Fair thing to ask about anything that rewrites your files. Five suites run before every
+			change, and a file that is already clean comes back byte for byte identical.
+		</p>
+		<p data-lang="fr">
+			Question légitime pour un truc qui réécrit tes fichiers. Cinq suites de tests tournent
+			avant chaque modification, et un fichier déjà propre ressort octet pour octet identique.
+		</p>
+
+		<pre class="term"><span class="p">$</span> python3 tools/tests/test_normfix.py     <span class="ok">26 passed, 0 failed</span>
+<span class="p">$</span> python3 tools/tests/test_semantics.py   <span class="ok"> 8 passed, 0 failed</span>
+<span class="p">$</span> python3 tools/tests/test_submit.py      <span class="ok">23 passed, 0 failed</span>
+<span class="p">$</span> python3 tools/tests/test_fuzz.py 30     <span class="ok">30 passed, 0 failed</span>
+<span class="p">$</span> python3 tools/tests/test_docs.py        <span class="ok">guide and READMEs agree</span></pre>
+
+		<p data-lang="en">
+			The semantics suite compiles each program, runs it, formats it, compiles and runs it
+			again, then checks the output is byte for byte the same. A formatter that changes what
+			your program prints is worse than no formatter.
+		</p>
+		<p data-lang="fr">
+			La suite « semantics » compile chaque programme, l'exécute, le formate, recompile et
+			relance, puis vérifie que la sortie est identique octet pour octet. Un formateur qui
+			change ce que ton programme affiche est pire que pas de formateur.
+		</p>
+
+		<p data-lang="en">
+			The fuzzer mangles working programs at random, joining statements onto one line, merging
+			declarations, swapping tabs for spaces, scattering blank lines around. Then it checks the
+			result still compiles, still prints the same thing, passes norminette, and does not
+			change on a second run. 210 rounds across 6 seeds pass. It found two real bugs, which is
+			the only reason I trust the other three suites.
+		</p>
+		<p data-lang="fr">
+			Le fuzzer massacre au hasard des programmes qui marchent : instructions collées sur une
+			ligne, déclarations fusionnées, tabulations remplacées par des espaces, lignes vides
+			éparpillées. Ensuite il vérifie que le résultat compile toujours, affiche toujours la
+			même chose, passe norminette, et ne bouge plus au deuxième passage. 210 tours sur 6
+			graines passent. Il a trouvé deux vrais bugs, et c'est la seule raison pour laquelle je
+			fais confiance aux trois autres suites.
+		</p>
+
+		<p data-lang="en">
+			It only ever touches <code>.c</code> and <code>.h</code>, and <code>normfmt -n</code>
+			checks without writing anything at all.
+		</p>
+		<p data-lang="fr">
+			Il ne touche que les <code>.c</code> et les <code>.h</code>, et <code>normfmt -n</code>
+			vérifie sans rien écrire.
+		</p>
+	</section>
+
+	<section>
+		<h2><span class="num">07</span><span data-lang="en">When something breaks</span><span data-lang="fr">Quand ça casse</span></h2>
+
+		<details>
+			<summary><span data-lang="en">normfmt: command not found</span><span data-lang="fr">normfmt: command not found</span></summary>
+			<p data-lang="en">
+				Open a new terminal. If it still happens, run
+				<code>export PATH="$HOME/.local/bin:$PATH"</code>.
+			</p>
+			<p data-lang="fr">
+				Ouvre un nouveau terminal. Si ça persiste, lance
+				<code>export PATH="$HOME/.local/bin:$PATH"</code>.
+			</p>
+		</details>
+
+		<details>
+			<summary><span data-lang="en">no python3 on PATH</span><span data-lang="fr">no python3 on PATH</span></summary>
+			<p data-lang="en">Run <code>xcode-select --install</code>, then start the installer again.</p>
+			<p data-lang="fr">Lance <code>xcode-select --install</code>, puis relance l'installeur.</p>
+		</details>
+
+		<details>
+			<summary><span data-lang="en">VS Code does nothing when I save</span><span data-lang="fr">VS Code ne fait rien quand je sauvegarde</span></summary>
+			<p data-lang="en">
+				The Run on Save extension is missing. Look for "Run on Save" by emeraldwalk in the
+				Extensions sidebar, then run <code>./tools/install.sh --editors-only</code>.
+			</p>
+			<p data-lang="fr">
+				L'extension Run on Save manque. Cherche « Run on Save » de emeraldwalk dans la barre
+				Extensions, puis lance <code>./tools/install.sh --editors-only</code>.
+			</p>
+		</details>
+
+		<details>
+			<summary><span data-lang="en">vim does nothing on :w</span><span data-lang="fr">vim ne fait rien sur :w</span></summary>
+			<p data-lang="en">
+				Check that <code>~/.vim/plugin/normfmt.vim</code> exists. If it does not, run
+				<code>./tools/install.sh</code> again. Neovim uses
+				<code>~/.config/nvim/plugin/</code>.
+			</p>
+			<p data-lang="fr">
+				Vérifie que <code>~/.vim/plugin/normfmt.vim</code> existe. Sinon, relance
+				<code>./tools/install.sh</code>. Neovim utilise
+				<code>~/.config/nvim/plugin/</code>.
+			</p>
+		</details>
+
+		<details>
+			<summary><span data-lang="en">Where did it put everything?</span><span data-lang="fr">Il a mis quoi, et où ?</span></summary>
+			<p data-lang="en">
+				<code>~/.42tools/</code> holds the virtualenv and the scripts,
+				<code>~/.local/bin/</code> holds the two commands, <code>~/.42toolsrc</code> holds
+				your login and email, and your editor's <code>settings.json</code> gains one rule,
+				backed up first. All of it lives under <code>$HOME</code>, so it survives between
+				sessions, unlike <code>~/goinfre</code>.
+				<code>./tools/install.sh --uninstall</code> takes it all back off.
+			</p>
+			<p data-lang="fr">
+				<code>~/.42tools/</code> contient le virtualenv et les scripts,
+				<code>~/.local/bin/</code> les deux commandes, <code>~/.42toolsrc</code> ton login et
+				ton mail, et le <code>settings.json</code> de ton éditeur gagne une règle, avec
+				sauvegarde préalable. Tout est sous <code>$HOME</code>, donc ça survit entre les
+				sessions, contrairement à <code>~/goinfre</code>.
+				<code>./tools/install.sh --uninstall</code> retire tout.
+			</p>
+		</details>
+	</section>
+
+	<section>
+		<h2><span class="num">08</span><span data-lang="en">How it works</span><span data-lang="fr">Comment ça marche</span></h2>
+
+		<p data-lang="en">
+			Two tools that know nothing about each other, plus glue.
+			<a href="https://github.com/cacharle/c_formatter_42">c_formatter_42</a>, written by a 42
+			student, reshapes the code in ten passes. The first is clang-format driven by a
+			Norm-shaped config; the other nine handle what clang-format cannot express, like putting
+			return values in parentheses. norminette then checks the result.
+		</p>
+		<p data-lang="fr">
+			Deux outils qui ne se connaissent pas, plus de la colle.
+			<a href="https://github.com/cacharle/c_formatter_42">c_formatter_42</a>, écrit par un
+			étudiant de 42, remet le code en forme en dix passes. La première est clang-format avec
+			une config taillée pour la Norme ; les neuf autres gèrent ce que clang-format ne sait pas
+			exprimer, comme mettre les valeurs de retour entre parenthèses. norminette vérifie
+			ensuite le résultat.
+		</p>
+
+		<p data-lang="en">
+			The gap between the two is where the work went. Rather than write a C parser to find the
+			errors the formatter leaves behind, <code>normfix</code> asks norminette where they are,
+			applies a targeted fix at that line, re-runs the formatter to realign, and repeats until
+			nothing fixable is left. Supporting a new error is one entry in a dict.
+		</p>
+		<p data-lang="fr">
+			Tout le travail est dans l'écart entre les deux. Plutôt que d'écrire un parseur C pour
+			trouver les erreurs que le formateur laisse derrière lui, <code>normfix</code> demande à
+			norminette où elles sont, applique un correctif ciblé à cette ligne, relance le formateur
+			pour réaligner, et recommence jusqu'à ce qu'il ne reste rien de corrigeable. Ajouter une
+			erreur, c'est une entrée dans un dict.
+		</p>
+	</section>
+
+	<footer>
+		<span>normfmt</span>
+		<span>norminette 3.3.59 · c_formatter_42 0.2.8</span>
+		<span>macOS &amp; Linux · Python 3.9+</span>
+	</footer>
+
+</div>
+
+<script>
+	(function () {
+		var root = document.documentElement;
+		var buttons = { en: document.getElementById('btn-en'), fr: document.getElementById('btn-fr') };
+
+		function setLang(lang) {
+			root.setAttribute('data-ui', lang);
+			root.setAttribute('lang', lang);
+			buttons.en.setAttribute('aria-pressed', String(lang === 'en'));
+			buttons.fr.setAttribute('aria-pressed', String(lang === 'fr'));
+			try { localStorage.setItem('normfmt-lang', lang); } catch (e) {}
+		}
+
+		var saved = null;
+		try { saved = localStorage.getItem('normfmt-lang'); } catch (e) {}
+		if (!saved) {
+			saved = (navigator.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
+		}
+		setLang(saved === 'fr' ? 'fr' : 'en');
+
+		buttons.en.addEventListener('click', function () { setLang('en'); });
+		buttons.fr.addEventListener('click', function () { setLang('fr'); });
+	})();
+</script>
