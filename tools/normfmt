@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# normfmt — format C sources to the 42 Norm, then verify with norminette.
+#
+#   normfmt file.c [file2.c ...]   format specific files
+#   normfmt                        format every .c/.h under the current directory
+#   normfmt -n ...                 check only, do not rewrite files
+#
+# Pipeline per file: c_formatter_42 (indent/spacing/decls/return parens)
+#                 -> 42header.py (prepend header if missing)
+#                 -> norminette (report what the formatter cannot fix)
+#
+# Portable: no sudo, no Homebrew. Everything lives in a Python venv created by
+# tools/install.sh, so it runs the same on a campus iMac as it does at home.
+
+set -uo pipefail
+
+TOOLS_HOME="${FT_TOOLS_HOME:-$HOME/.42tools}"
+VENV_BIN="$TOOLS_HOME/venv/bin"
+
+# Identity for the 42 header. ~/.42toolsrc is written by install.sh.
+[ -f "$HOME/.42toolsrc" ] && . "$HOME/.42toolsrc"
+LOGIN="${FT_LOGIN:-$USER}"
+EMAIL="${FT_EMAIL:-$LOGIN@learner.42.tech}"
+
+# Resolve this script's real directory so the vendored header generator is found
+# whether normfmt is run directly or through a symlink in ~/.local/bin.
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+	LINK=$(readlink "$SELF")
+	case "$LINK" in
+		/*) SELF="$LINK" ;;
+		*) SELF="$(dirname "$SELF")/$LINK" ;;
+	esac
+done
+SELF_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+HEADER_GEN="$SELF_DIR/42header.py"
+[ -f "$HEADER_GEN" ] || HEADER_GEN="$TOOLS_HOME/42header.py"
+NORMFIX="$SELF_DIR/normfix.py"
+[ -f "$NORMFIX" ] || NORMFIX="$TOOLS_HOME/normfix.py"
+
+# Prefer the venv, then anything already on PATH.
+export PATH="$VENV_BIN:$HOME/.local/bin:/opt/homebrew/bin:$PATH"
+
+for bin in c_formatter_42 norminette; do
+	command -v "$bin" >/dev/null 2>&1 || {
+		echo "normfmt: $bin not found — run tools/install.sh first" >&2
+		exit 127
+	}
+done
+
+CHECK_ONLY=0
+if [ "${1-}" = "-n" ] || [ "${1-}" = "--check" ]; then
+	CHECK_ONLY=1
+	shift
+fi
+
+# Filter mode: read a file on stdin, write the formatted file on stdout.
+# This is what editors want — vim's 'formatprg', or any :%!normfmt - pipeline —
+# because it keeps undo history and never touches the file behind the editor.
+#
+#   normfmt - <realname.c>
+#
+# The real filename matters: it is what goes in the 42 header and in a .h
+# include guard, so pass it even though the content arrives on stdin.
+if [ "${1-}" = "-" ] || [ "${1-}" = "--stdin" ]; then
+	NAME=$(basename "${2:-stdin.c}")
+	TMPDIR_FMT=$(mktemp -d)
+	trap 'rm -rf "$TMPDIR_FMT"' EXIT
+	TMPFILE="$TMPDIR_FMT/$NAME"
+	cat > "$TMPFILE"
+	(
+		cd "$TMPDIR_FMT" || exit 1
+		c_formatter_42 "$TMPFILE" >/dev/null 2>&1
+		[ -f "$HEADER_GEN" ] && ! head -n 1 "$TMPFILE" | grep -q '^/\* \*\+' &&
+			python3 "$HEADER_GEN" "$LOGIN" "$EMAIL" "$TMPFILE" >/dev/null
+		[ -f "$NORMFIX" ] && python3 "$NORMFIX" "$TMPFILE" >/dev/null 2>&1
+	)
+	cat "$TMPFILE"
+	exit 0
+fi
+
+if [ "$#" -gt 0 ]; then
+	FILES=("$@")
+else
+	FILES=()
+	while IFS= read -r f; do
+		FILES+=("$f")
+	done < <(find . -type f \( -name '*.c' -o -name '*.h' \) \
+		-not -path '*/.git/*' -not -path '*/graphify-out/*')
+fi
+
+if [ "${#FILES[@]}" -eq 0 ]; then
+	echo "normfmt: no .c/.h files found"
+	exit 0
+fi
+
+has_header() {
+	head -n 1 "$1" | grep -q '^/\* \*\+'
+}
+
+if [ "$CHECK_ONLY" -eq 0 ]; then
+	c_formatter_42 "${FILES[@]}" >/dev/null 2>&1
+
+	if [ -f "$HEADER_GEN" ]; then
+		for f in "${FILES[@]}"; do
+			has_header "$f" || python3 "$HEADER_GEN" "$LOGIN" "$EMAIL" "$f" >/dev/null
+		done
+	fi
+
+	# Structural fixes the formatter alone does not make, driven by
+	# norminette's own error output. See tools/normfix.py.
+	[ -f "$NORMFIX" ] && python3 "$NORMFIX" "${FILES[@]}" >/dev/null 2>&1
+fi
+
+norminette "${FILES[@]}" 2>&1 | grep -v '^Setting locale'
+STATUS="${PIPESTATUS[0]}"
+
+if [ "$STATUS" -ne 0 ] && [ -f "$NORMFIX" ]; then
+	python3 "$NORMFIX" --hints "${FILES[@]}" 2>/dev/null
+fi
+
+exit "$STATUS"

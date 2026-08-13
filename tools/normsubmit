@@ -1,0 +1,425 @@
+#!/usr/bin/env python3
+"""normsubmit — check what you are about to hand to Moulinette.
+
+Two failure modes this exists to prevent:
+
+  1. Submitting a `main()` in a file where the subject asked only for the
+     function. `--strip-main` comments it out, reversibly.
+  2. Submitting files the subject never named. Extra files are a common cause
+     of a zero, so this lists everything that looks like it does not belong.
+
+    normsubmit                  report only, changes nothing
+    normsubmit --strip-main     comment out main() in the .c files given
+    normsubmit --restore-main   put every stripped main() back
+    normsubmit --clean          delete build junk (add --yes to skip the prompt)
+    normsubmit --gitignore      write a .gitignore suited to a 42 repo
+
+With no file arguments it works on the current directory, recursively.
+Nothing is ever deleted without you seeing the list first.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+import sys
+from typing import List, Optional, Tuple
+
+BEGIN = "// >>> normsubmit: main() commented out for submission"
+END = "// <<< normsubmit: end of commented-out main()"
+
+# Safe to delete: build output and OS/editor droppings. Nothing you wrote.
+JUNK_FILES = {".DS_Store", "a.out", "Thumbs.db", ".netrwhist"}
+JUNK_SUFFIXES = (".o", ".a", ".so", ".dylib", ".gch", ".pch", ".swp", ".swo", "~", ".orig", ".rej")
+JUNK_DIRS = {".dSYM", "__MACOSX", ".vscode", ".idea", "obj", "build"}
+
+# Never deleted, only reported: these are yours, they just may not belong in
+# the repo the subject describes.
+SUSPICIOUS_RE = re.compile(r"^(main\.c|test.*\.c|.*_test\.c|tests?\.c|scratch.*\.c|tmp.*\.c)$", re.I)
+
+SKIP_DIRS = {".git", "graphify-out", "node_modules", "venv", ".venv"}
+
+MAIN_RE = re.compile(r"^\s*(?:static\s+)?(?:int|void)\s+\**\s*main\s*\(")
+
+GITIGNORE = """\
+# Build output — never submit these.
+*.o
+*.a
+*.so
+*.dylib
+*.gch
+a.out
+*.dSYM/
+
+# OS and editor droppings.
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Local test drivers. Keep them out of the repo the subject describes;
+# delete the line for any file the subject actually asks you to turn in.
+main.c
+test_*.c
+"""
+
+
+# --------------------------------------------------------------- inventory ---
+
+
+def walk(paths: List[str]) -> List[str]:
+    out: List[str] = []
+    for path in paths:
+        if os.path.isfile(path):
+            out.append(path)
+            continue
+        for root, dirs, files in os.walk(path):
+            dirs[:] = [
+                d for d in dirs
+                if d not in SKIP_DIRS and not any(d.endswith(j) for j in JUNK_DIRS)
+            ]
+            for name in files:
+                out.append(os.path.join(root, name))
+    return sorted(out)
+
+
+def junk_dirs_under(paths: List[str]) -> List[str]:
+    found = []
+    for path in paths:
+        if not os.path.isdir(path):
+            continue
+        for root, dirs, _ in os.walk(path):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+            for d in list(dirs):
+                if d in JUNK_DIRS or d.endswith(".dSYM"):
+                    found.append(os.path.join(root, d))
+                    dirs.remove(d)
+    return sorted(found)
+
+
+def is_junk(path: str) -> bool:
+    name = os.path.basename(path)
+    return name in JUNK_FILES or name.endswith(JUNK_SUFFIXES)
+
+
+def is_binary(path: str) -> bool:
+    """A compiled executable, as opposed to a script."""
+    if not os.access(path, os.X_OK) or os.path.isdir(path):
+        return False
+    try:
+        with open(path, "rb") as f:
+            head = f.read(512)
+    except OSError:
+        return False
+    if head[:2] == b"#!":
+        return False
+    magic = (
+        b"\x7fELF",              # ELF
+        b"\xcf\xfa\xed\xfe",     # Mach-O 64, little endian
+        b"\xce\xfa\xed\xfe",     # Mach-O 32
+        b"\xca\xfe\xba\xbe",     # Mach-O universal
+    )
+    return head.startswith(magic) or b"\0" in head
+
+
+def git(args: List[str], cwd: str = ".") -> Optional[str]:
+    try:
+        proc = subprocess.run(
+            ["git"] + args, capture_output=True, text=True, cwd=cwd, check=False
+        )
+    except FileNotFoundError:
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def tracked_files(cwd: str = ".") -> Optional[List[str]]:
+    out = git(["ls-files"], cwd)
+    return None if out is None else [f for f in out.splitlines() if f]
+
+
+# ------------------------------------------------------------ main() strip ---
+
+
+def find_main(lines: List[str]) -> Optional[Tuple[int, int]]:
+    """(start, end) line indices of the main function, inclusive."""
+    for i, line in enumerate(lines):
+        if line.startswith("//") or not MAIN_RE.match(line):
+            continue
+        # Walk forward to the opening brace, then match it. A brace inside a
+        # string or char literal — '{' — must not count.
+        depth = 0
+        seen_brace = False
+        for j in range(i, len(lines)):
+            quote = None
+            escaped = False
+            for ch in lines[j]:
+                if quote:
+                    if escaped:
+                        escaped = False
+                    elif ch == "\\":
+                        escaped = True
+                    elif ch == quote:
+                        quote = None
+                    continue
+                if ch in "\"'":
+                    quote = ch
+                elif ch == "{":
+                    depth += 1
+                    seen_brace = True
+                elif ch == "}":
+                    depth -= 1
+            if seen_brace and depth == 0:
+                return i, j
+        return None
+    return None
+
+
+def strip_main(path: str) -> bool:
+    with open(path) as f:
+        lines = f.read().split("\n")
+    if BEGIN in lines:
+        return False
+    span = find_main(lines)
+    if span is None:
+        return False
+    start, end = span
+
+    # Take any blank lines directly above with it, so we do not leave a hole.
+    while start > 0 and lines[start - 1].strip() == "":
+        start -= 1
+
+    body = ["// " + ln if ln.strip() else "//" for ln in lines[start:end + 1]]
+    lines[start:end + 1] = [BEGIN] + body + [END]
+    with open(path, "w") as f:
+        f.write("\n".join(lines).rstrip("\n") + "\n")
+    return True
+
+
+def restore_main(path: str) -> bool:
+    with open(path) as f:
+        lines = f.read().split("\n")
+    if BEGIN not in lines or END not in lines:
+        return False
+    start, end = lines.index(BEGIN), lines.index(END)
+    body = []
+    for ln in lines[start + 1:end]:
+        if ln.startswith("// "):
+            body.append(ln[3:])
+        elif ln.startswith("//"):
+            body.append(ln[2:])
+        else:
+            body.append(ln)
+    lines[start:end + 1] = body
+    with open(path, "w") as f:
+        f.write("\n".join(lines).rstrip("\n") + "\n")
+    return True
+
+
+def has_main(path: str) -> bool:
+    if not path.endswith(".c"):
+        return False
+    try:
+        with open(path) as f:
+            lines = f.read().split("\n")
+    except (OSError, UnicodeDecodeError):
+        return False
+    return find_main(lines) is not None
+
+
+STDIO_USERS = re.compile(
+    r"\b(printf|fprintf|sprintf|snprintf|scanf|sscanf|puts|fputs|putchar|"
+    r"getchar|fgets|perror|fopen|fclose|FILE)\b"
+)
+
+
+def unused_stdio(path: str) -> bool:
+    """<stdio.h> left behind after the main() that needed it was commented out."""
+    try:
+        with open(path, errors="ignore") as f:
+            lines = f.read().split("\n")
+    except OSError:
+        return False
+    if not any(re.match(r"^\s*#\s*include\s*<stdio\.h>", ln) for ln in lines):
+        return False
+    live = [ln for ln in lines if not ln.lstrip().startswith("//")]
+    return not STDIO_USERS.search("\n".join(live))
+
+
+# ------------------------------------------------------------------ report ---
+
+
+def report(paths: List[str]) -> int:
+    files = walk(paths)
+    junk = [f for f in files if is_junk(f)] + junk_dirs_under(paths)
+    binaries = [f for f in files if is_binary(f) and f not in junk]
+    sources = [f for f in files if f.endswith((".c", ".h"))]
+    suspicious = [f for f in sources if SUSPICIOUS_RE.match(os.path.basename(f))]
+    with_main = [f for f in sources if has_main(f)]
+    stripped = [f for f in sources if BEGIN in open(f, errors="ignore").read()]
+
+    other = [
+        f for f in files
+        if not f.endswith((".c", ".h")) and f not in junk and f not in binaries
+        and os.path.basename(f) not in {".gitignore", "Makefile", "author"}
+    ]
+
+    print(f"{len(sources)} source file(s), {len(files)} file(s) total\n")
+
+    problems = 0
+
+    if with_main:
+        problems += 1
+        print("main() found — the subject usually asks for the function only:")
+        for f in sorted(with_main):
+            note = "  (looks like a test driver — do not submit it at all)" \
+                if f in suspicious else ""
+            print(f"  {f}{note}")
+        # Stripping a file that is itself a test driver makes no sense; that
+        # one should simply not be staged.
+        strippable = sorted(set(with_main) - set(suspicious))
+        if strippable:
+            print("  fix: normsubmit --strip-main " + " ".join(strippable))
+        print()
+
+    if stripped:
+        print("main() currently commented out (normsubmit --restore-main undoes it):")
+        for f in sorted(stripped):
+            print(f"  {f}")
+        print()
+
+    orphan_includes = [f for f in sources if unused_stdio(f)]
+    if orphan_includes:
+        print("<stdio.h> included but nothing in the live code uses it:")
+        for f in sorted(orphan_includes):
+            print(f"  {f}")
+        print("  it was probably only there for the main() you stripped\n")
+
+    if junk or binaries:
+        problems += 1
+        print("build output / junk — delete before committing:")
+        for f in sorted(set(junk) | set(binaries)):
+            print(f"  {f}")
+        print("  fix: normsubmit --clean\n")
+
+    if suspicious:
+        problems += 1
+        print("probably not a deliverable — check the subject before staging:")
+        for f in sorted(suspicious):
+            print(f"  {f}")
+        print()
+
+    if other:
+        print("not a .c/.h file — submit only if the subject names it:")
+        for f in sorted(other):
+            print(f"  {f}")
+        print()
+
+    tracked = tracked_files()
+    if tracked is not None:
+        bad_tracked = [
+            f for f in tracked
+            if is_junk(f) or SUSPICIOUS_RE.match(os.path.basename(f)) or has_main(f)
+        ]
+        if bad_tracked:
+            problems += 1
+            print("git is already tracking these — they WILL be submitted:")
+            for f in sorted(bad_tracked):
+                print(f"  {f}")
+            print("  fix: git rm --cached <file>, and add it to .gitignore\n")
+
+    if problems == 0:
+        print("Nothing suspicious. Stage files by name — never `git add .`")
+    return 1 if problems else 0
+
+
+# ------------------------------------------------------------------- clean ---
+
+
+def clean(paths: List[str], assume_yes: bool) -> int:
+    files = [f for f in walk(paths) if is_junk(f) or is_binary(f)]
+    dirs = junk_dirs_under(paths)
+    targets = sorted(files) + sorted(dirs)
+
+    if not targets:
+        print("nothing to clean")
+        return 0
+
+    print("about to delete:")
+    for t in targets:
+        print(f"  {t}{'/' if os.path.isdir(t) else ''}")
+
+    if not assume_yes:
+        try:
+            answer = input("\ndelete these? [y/N] ").strip().lower()
+        except EOFError:
+            answer = ""
+        if answer not in {"y", "yes"}:
+            print("nothing deleted")
+            return 0
+
+    import shutil
+
+    for t in targets:
+        if os.path.isdir(t):
+            shutil.rmtree(t, ignore_errors=True)
+        else:
+            try:
+                os.remove(t)
+            except OSError as exc:
+                print(f"  could not remove {t}: {exc}")
+    print(f"\ndeleted {len(targets)} item(s)")
+    return 0
+
+
+# -------------------------------------------------------------------- main ---
+
+
+def main(argv: List[str]) -> int:
+    flags = {a for a in argv if a.startswith("-")}
+    paths = [a for a in argv if not a.startswith("-")] or ["."]
+
+    if "-h" in flags or "--help" in flags:
+        print(__doc__.strip())
+        return 0
+
+    if "--gitignore" in flags:
+        target = os.path.join(paths[0] if os.path.isdir(paths[0]) else ".", ".gitignore")
+        if os.path.exists(target):
+            print(f"{target} already exists — not overwriting. Suggested contents:\n")
+            print(GITIGNORE)
+            return 0
+        with open(target, "w") as f:
+            f.write(GITIGNORE)
+        print(f"wrote {target}")
+        return 0
+
+    if "--strip-main" in flags:
+        targets = [f for f in walk(paths) if f.endswith(".c")]
+        changed = [f for f in targets if strip_main(f)]
+        for f in changed:
+            print(f"stripped main() from {f}")
+        if not changed:
+            print("no main() to strip")
+        return 0
+
+    if "--restore-main" in flags:
+        targets = [f for f in walk(paths) if f.endswith(".c")]
+        changed = [f for f in targets if restore_main(f)]
+        for f in changed:
+            print(f"restored main() in {f}")
+        if not changed:
+            print("no stripped main() found")
+        return 0
+
+    if "--clean" in flags:
+        return clean(paths, "--yes" in flags or "-y" in flags)
+
+    return report(paths)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

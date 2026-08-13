@@ -1,0 +1,39 @@
+// Zero-extension alternative for VS Code / Cursor: a task you trigger yourself.
+//
+// Save as .vscode/tasks.json, then bind it — Cmd+Shift+P -> "Tasks: Run Task"
+// -> "normfmt: current file". To get a keybinding, add to keybindings.json:
+//
+//     {
+//       "key": "cmd+alt+n",
+//       "command": "workbench.action.tasks.runTask",
+//       "args": "normfmt: current file"
+//     }
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "normfmt: current file",
+			"type": "shell",
+			"command": "$HOME/.local/bin/normfmt",
+			"args": ["${file}"],
+			"presentation": {
+				"reveal": "silent",
+				"panel": "shared"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "normfmt: whole project",
+			"type": "shell",
+			"command": "$HOME/.local/bin/normfmt",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			},
+			"problemMatcher": []
+		}
+	]
+}

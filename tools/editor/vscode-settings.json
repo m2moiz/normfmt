@@ -1,0 +1,22 @@
+// Format .c/.h with normfmt on every save, in VS Code or Cursor.
+//
+// 1. Install the "Run on Save" extension by emeraldwalk:
+//        ext install emeraldwalk.RunOnSave
+//    (Extensions sidebar -> search "Run on Save" -> the emeraldwalk one)
+//
+// 2. Merge the block below into your settings.json
+//        Cmd+Shift+P -> "Preferences: Open User Settings (JSON)"
+//    or, to keep it scoped to this repo, into .vscode/settings.json
+//
+// normfmt rewrites the file on disk. The editor buffer is clean right after a
+// save, so the change is picked up without a prompt.
+{
+	"emeraldwalk.runonsave": {
+		"commands": [
+			{
+				"match": "\\.(c|h)$",
+				"cmd": "$HOME/.local/bin/normfmt \"${file}\""
+			}
+		]
+	}
+}
