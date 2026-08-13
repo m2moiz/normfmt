@@ -11,7 +11,7 @@
 #   ~/.local/bin/           normfmt and normsubmit
 #   ~/.42toolsrc           your login and email, for the 42 header
 #   ~/.vim/plugin/         format-on-save for vim / neovim
-#   VS Code / Cursor       format-on-save rule in your user settings
+#   VS Code                format-on-save rule in your user settings
 #
 # Re-running is safe: it upgrades in place and never duplicates anything.
 

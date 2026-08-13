@@ -1,4 +1,4 @@
-// Zero-extension alternative for VS Code / Cursor: a task you trigger yourself.
+// Zero-extension alternative for VS Code: a task you trigger yourself.
 //
 // Save as .vscode/tasks.json, then bind it — Cmd+Shift+P -> "Tasks: Run Task"
 // -> "normfmt: current file". To get a keybinding, add to keybindings.json:

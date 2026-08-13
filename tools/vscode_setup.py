@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wire normfmt into VS Code / Cursor's format-on-save.
+"""Wire normfmt into VS Code's format-on-save.
 
 Adds an `emeraldwalk.runonsave` rule for .c/.h to the user settings of every
 editor it finds. The settings file is backed up first, and if it cannot be
@@ -160,7 +160,7 @@ def main(argv: list[str]) -> int:
                   "(rewriting drops any // comments you had)")
 
     if not found:
-        print("    no VS Code / Cursor installation found — skipping")
+        print("    no VS Code installation found — skipping")
     return 0
 
 

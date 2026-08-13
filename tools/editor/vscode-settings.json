@@ -1,4 +1,4 @@
-// Format .c/.h with normfmt on every save, in VS Code or Cursor.
+// Format .c/.h with normfmt on every save, in VS Code.
 //
 // 1. Install the "Run on Save" extension by emeraldwalk:
 //        ext install emeraldwalk.RunOnSave
